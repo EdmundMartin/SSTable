@@ -63,6 +63,10 @@ func NewRecord(key, value []byte, countFunc AtomicCounter) *Record {
 	return r
 }
 
+func (r *Record) Deleted() bool {
+	return bytes.Compare(r.Value, TombstoneMarker) == 0
+}
+
 func (r *Record) ToBytes() ([]byte, error) {
 	contents := make([]byte, r.Size())
 

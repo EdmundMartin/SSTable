@@ -3,7 +3,6 @@ package sstable
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"os"
 )
 
@@ -43,8 +42,6 @@ func (d *DiskTable) binarySearch(key []byte) (*Record, error) {
 
 	var low uint32
 	high := d.TableMeta.KeyCount - 1
-	stats, _ := d.file.Stat()
-	fmt.Println(stats)
 	for low <= high {
 		middle := (low + high) / 2
 
@@ -69,6 +66,9 @@ func (d *DiskTable) binarySearch(key []byte) (*Record, error) {
 
 func (d *DiskTable) Contains(key []byte) (bool, error) {
 	val, err := d.binarySearch(key)
+	if val.Deleted() {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -83,8 +83,70 @@ func (d *DiskTable) Get(key []byte) (*Record, error) {
 	if val == nil {
 		return nil, nil
 	}
-	if bytes.Compare(val.Value, TombstoneMarker) == 0 {
+	if val.Deleted() {
 		return nil, nil
 	}
 	return val, nil
+}
+
+func (d *DiskTable) Scan() ([]*Record, error) {
+	results := make([]*Record, 0, d.TableMeta.KeyCount)
+	for i := 0; i < int(d.TableMeta.KeyCount); i++ {
+		offset := d.TableMeta.Offsets[i]
+		rec, err := RecordFromDisk(d.file, int64(offset))
+		if err != nil {
+			return nil, err
+		}
+		if !rec.Deleted() {
+			results = append(results, rec)
+		}
+	}
+	return results, nil
+}
+
+func (d *DiskTable) ScanWithLimit(limit *Limit) ([]*Record, error) {
+	resultSize := min(d.TableMeta.KeyCount, uint32(limit.MaxResults))
+	results := make([]*Record, 0, resultSize)
+
+	for i := 0; i < int(d.TableMeta.KeyCount); i++ {
+		if len(results) == int(resultSize) {
+			return results, nil
+		}
+		offset := d.TableMeta.Offsets[i]
+		rec, err := RecordFromDisk(d.file, int64(offset))
+		if err != nil {
+			return nil, err
+		}
+		if !rec.Deleted() {
+			results = append(results, rec)
+		}
+	}
+	return results, nil
+}
+
+func (d *DiskTable) ScanWithPredicate(pred Predicate, limit *Limit) ([]*Record, error) {
+	resultSize := min(d.TableMeta.KeyCount, uint32(limit.MaxResults))
+	results := make([]*Record, 0, resultSize)
+
+	for i := 0; i < int(d.TableMeta.KeyCount); i++ {
+		if len(results) == int(resultSize) {
+			return results, nil
+		}
+		offset := d.TableMeta.Offsets[i]
+		rec, err := RecordFromDisk(d.file, int64(offset))
+		if err != nil {
+			return nil, err
+		}
+		if !rec.Deleted() && pred(rec.Key, rec.Value) {
+			results = append(results, rec)
+		}
+	}
+	return results, nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

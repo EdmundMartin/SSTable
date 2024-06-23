@@ -90,3 +90,35 @@ func TestRecordFromDisk(t *testing.T) {
 	assert.Equal(t, uint64(174), res.AtomicCount)
 	assert.NoError(t, err)
 }
+
+func TestRecord_Deleted(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		Name          string
+		ExpectDeleted bool
+		Value         []byte
+	}{
+		{
+			Name:          "not deleted",
+			ExpectDeleted: false,
+			Value:         []byte("Привет всем"),
+		},
+		{
+			Name:          "deleted",
+			ExpectDeleted: true,
+			Value:         TombstoneMarker,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			record := &Record{Value: tc.Value}
+
+			if tc.ExpectDeleted {
+				assert.True(t, record.Deleted())
+			} else {
+				assert.False(t, record.Deleted())
+			}
+		})
+	}
+}

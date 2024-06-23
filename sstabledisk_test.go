@@ -59,3 +59,40 @@ func TestDiskTable_Contains(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestDiskTable_Scan(t *testing.T) {
+	testTableName := "TestDiskTableScan"
+	contents := [][]byte{
+		[]byte("A"),
+		[]byte("B"),
+		[]byte("C"),
+		[]byte("D"),
+		[]byte("E"),
+		[]byte("F"),
+	}
+
+	var counter uint64
+	var allRecords []*Record
+
+	countFunc := func() uint64 {
+		return atomic.AddUint64(&counter, 1)
+	}
+
+	for _, content := range contents {
+		allRecords = append(allRecords, NewRecord(content, content, countFunc))
+	}
+
+	table := NewSSTable("ExampleTest", allRecords)
+	err := table.SaveToDisk(func(tableName string) string {
+		return testTableName
+	})
+	require.NoError(t, err)
+	defer os.Remove(testTableName)
+
+	diskTable, err := NewDiskTable(testTableName)
+	assert.NoError(t, err)
+
+	results, err := diskTable.Scan()
+	assert.NoError(t, err)
+	assert.Equal(t, allRecords, results)
+}
