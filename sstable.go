@@ -55,7 +55,7 @@ func (s *SSTable) ScanWithLimit(limit *Limit) ([]*Record, error) {
 }
 
 func (s *SSTable) ScanWithPredicate(pred Predicate, limit *Limit) ([]*Record, error) {
-	limitValue := math.MaxUint64
+	limitValue := math.MaxInt
 	if limit != nil {
 		limitValue = int(limit.MaxResults)
 	}

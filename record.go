@@ -52,6 +52,12 @@ type Record struct {
 
 type AtomicCounter func() uint64
 
+func NewRecordWithCount(key, value []byte, count uint64) *Record {
+	return NewRecord(key, value, func() uint64 {
+		return count
+	})
+}
+
 func NewRecord(key, value []byte, countFunc AtomicCounter) *Record {
 	r := &Record{
 		KeySize:     uint32(len(key)),
